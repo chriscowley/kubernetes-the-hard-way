@@ -14,13 +14,28 @@ The Kubernetes [networking model](https://kubernetes.io/docs/concepts/cluster-ad
 
 In this section a dedicated [Virtual Private Cloud](https://cloud.google.com/compute/docs/networks-and-firewalls#networks) (VPC) network will be setup to host the Kubernetes cluster.
 
+#### GCP
+
 Create the `kubernetes-the-hard-way` custom VPC network:
 
 ```
 gcloud compute networks create kubernetes-the-hard-way --mode custom
 ```
 
+#### Openstack
+
+Create a private network:
+
+```
+openstack network create kubernetes-the-hard-way
+```
+
+Note: on my host (OVH) this returns `'NoneType' object is not iterable` but it creates the network anyway.
+
+
 A [subnet](https://cloud.google.com/compute/docs/vpc/#vpc_networks_and_subnets) must be provisioned with an IP address range large enough to assign a private IP address to each node in the Kubernetes cluster.
+
+#### GCP
 
 Create the `kubernetes` subnet in the `kubernetes-the-hard-way` VPC network:
 
@@ -30,11 +45,24 @@ gcloud compute networks subnets create kubernetes \
   --range 10.240.0.0/24
 ```
 
+#### Openstack
+
+Create the `kubernetes` subnet on the `kubernetes-the-hard-way` private network.
+
+```
+openstack subnet create kubernetes --network kubernetes-the-hard-way --subnet-range 10.240.0.0/24
+```
+
+Note: Again this returns `'NoneType' object is not iterable`, but actually works perfectly
+
+
 > The `10.240.0.0/24` IP address range can host up to 254 compute instances.
 
 ### Firewall Rules
 
 Create a firewall rule that allows internal communication across all protocols:
+
+#### GCP
 
 ```
 gcloud compute firewall-rules create kubernetes-the-hard-way-allow-internal \
@@ -43,13 +71,34 @@ gcloud compute firewall-rules create kubernetes-the-hard-way-allow-internal \
   --source-ranges 10.240.0.0/24,10.200.0.0/16
 ```
 
+#### Openstack
+
+```
+openstack security group create kubernetes-the-hard-way-allow-internal
+openstack security group rule create --proto tcp --remote-group=kubernetes-the-hard-way-allow-internal --dst-port 1:65525 kubernetes-the-hard-way-allow-internal
+openstack security group rule create --proto udp --remote-group=kubernetes-the-hard-way-allow-internal --dst-port 1:65525 kubernetes-the-hard-way-allow-internal
+openstack security group rule create --proto icmp --remote-group=kubernetes-the-hard-way-allow-internal kubernetes-the-hard-way-allow-internal
+```
+
+
+
 Create a firewall rule that allows external SSH, ICMP, and HTTPS:
+
+#### GCP
 
 ```
 gcloud compute firewall-rules create kubernetes-the-hard-way-allow-external \
   --allow tcp:22,tcp:6443,icmp \
   --network kubernetes-the-hard-way \
   --source-ranges 0.0.0.0/0
+```
+
+#### Openstack
+
+```
+openstack security group create kubernetes-the-hard-way-allow-external
+openstack security group rule create --proto tcp --dst-port=22 kubernetes-the-hard-way-allow-external
+openstack security group rule create --proto tcp --dst-port=6443 kubernetes-the-hard-way-allow-external
 ```
 
 > An [external load balancer](https://cloud.google.com/compute/docs/load-balancing/network/) will be used to expose the Kubernetes API Servers to remote clients.
@@ -98,6 +147,8 @@ The compute instances in this lab will be provisioned using [Ubuntu Server](http
 
 Create three compute instances which will host the Kubernetes control plane:
 
+#### GCP
+
 ```
 for i in 0 1 2; do
   gcloud compute instances create controller-${i} \
@@ -111,6 +162,29 @@ for i in 0 1 2; do
     --scopes compute-rw,storage-ro,service-management,service-control,logging-write,monitoring \
     --subnet kubernetes \
     --tags kubernetes-the-hard-way,controller
+done
+```
+
+#### Openstack
+
+You will need to collect some information specific to your cloud first.
+
+```
+IMAGEID=$(glance image-list | grep 'Ubuntu 16.04' | awk '{print $2}')
+```
+
+Note: You may need to modify that based on the output of `glance image-list` to ensure you get the correct image.
+
+FLAVORID=$(nova flavor-list | grep 'vps-ssd-1' | awk '{print $2}')
+
+```
+for i in 0 1 2
+do
+    nova boot --image='Ubuntu 16.04' --flavor=vps-ssd-1 \
+        --nic net-name=kubernetes-the-hard-way,v4-fixed-ip=10.240.0.1${i} \
+        --nic net-name=Ext-Net \
+        --security-groups=kubernetes-the-hard-way-allow-internal,kubernetes-the-hard-way-allow-external \
+        --key-name chris controller-${i}
 done
 ```
 
