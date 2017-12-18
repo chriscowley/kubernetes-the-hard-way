@@ -1,0 +1,11 @@
+#cloud-config
+#
+write_files:
+    - path: /etc/network/interfaces.d/01-kube-the-hardway.cfg
+      content: |
+          auto ens4
+          iface ens4 inet dhcp
+    - path: /etc/sysctl.d/99-ipv4_forward.conf
+      content: net.ipv4.ip_forward=1
+power_state:
+    mode: reboot

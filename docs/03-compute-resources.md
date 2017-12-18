@@ -50,7 +50,7 @@ gcloud compute networks subnets create kubernetes \
 Create the `kubernetes` subnet on the `kubernetes-the-hard-way` private network.
 
 ```
-openstack subnet create kubernetes --network kubernetes-the-hard-way --subnet-range 10.240.0.0/24
+openstack subnet create kubernetes --network kubernetes-the-hard-way --subnet-range 10.240.0.0/24 --no-gateway
 ```
 
 Note: Again this returns `'NoneType' object is not iterable`, but actually works perfectly
@@ -181,7 +181,7 @@ FLAVORID=$(nova flavor-list | grep 'vps-ssd-1' | awk '{print $2}')
 for i in 0 1 2
 do
   nova boot --image='Ubuntu 16.04' --flavor=vps-ssd-1 \
-    --metadata kubetype=controller \
+    --meta kubetype=controller \
     --nic net-name=Ext-Net \
     --nic net-name=kubernetes-the-hard-way,v4-fixed-ip=10.240.0.1${i} \
     --security-groups=kubernetes-the-hard-way-allow-internal,kubernetes-the-hard-way-allow-external \
