@@ -181,10 +181,11 @@ FLAVORID=$(nova flavor-list | grep 'vps-ssd-1' | awk '{print $2}')
 for i in 0 1 2
 do
     nova boot --image='Ubuntu 16.04' --flavor=vps-ssd-1 \
-        --nic net-name=kubernetes-the-hard-way,v4-fixed-ip=10.240.0.1${i} \
         --nic net-name=Ext-Net \
+        --nic net-name=kubernetes-the-hard-way,v4-fixed-ip=10.240.0.1${i} \
         --security-groups=kubernetes-the-hard-way-allow-internal,kubernetes-the-hard-way-allow-external \
-        --key-name chris controller-${i}
+        --tags kubernetes-the-hard-way,controller \
+        --user-data scripts/controller-userdata.yml --key-name chris controller-${i}
 done
 ```
 
@@ -195,6 +196,8 @@ Each worker instance requires a pod subnet allocation from the Kubernetes cluste
 > The Kubernetes cluster CIDR range is defined by the Controller Manager's `--cluster-cidr` flag. In this tutorial the cluster CIDR range will be set to `10.200.0.0/16`, which supports 254 subnets.
 
 Create three compute instances which will host the Kubernetes worker nodes:
+
+#### GCP
 
 ```
 for i in 0 1 2; do
@@ -213,9 +216,26 @@ for i in 0 1 2; do
 done
 ```
 
+#### Openstack
+
+```
+for i in 0 1 2
+do
+    nova boot --image='Ubuntu 16.04' --flavor=vps-ssd-1 \
+        --nic net-name=Ext-Net \
+        --nic net-name=kubernetes-the-hard-way,v4-fixed-ip=10.240.0.2${i} \
+        --security-groups=kubernetes-the-hard-way-allow-internal,kubernetes-the-hard-way-allow-external \
+        --meta pod-cidr=10.200.${i}.0/24 \
+        --tags kubernetes-the-hard-way,worker \
+        --user-data scripts/controller-userdata.yml --key-name chris controller-${i}
+done
+```
+
 ### Verification
 
 List the compute instances in your default compute zone:
+
+#### GCP
 
 ```
 gcloud compute instances list
@@ -231,6 +251,28 @@ controller-2  us-west1-c  n1-standard-1               10.240.0.12  XX.XXX.XXX.XX
 worker-0      us-west1-c  n1-standard-1               10.240.0.20  XXX.XXX.XXX.XX  RUNNING
 worker-1      us-west1-c  n1-standard-1               10.240.0.21  XX.XXX.XX.XXX   RUNNING
 worker-2      us-west1-c  n1-standard-1               10.240.0.22  XXX.XXX.XX.XX   RUNNING
+```
+
+#### Openstack
+
+```
+nova list --name="worker*|controller*" --minimal
+```
+
+> output
+
+```
++--------------------------------------+--------------+
+| ID                                   | Name         |
++--------------------------------------+--------------+
+| 42f45d04-72af-499f-967a-3fc6d48e6661 | controller-0 |
+| e527bfdc-dd30-41f1-9925-b32619131bb5 | controller-1 |
+| f22b602e-ab6d-4bd8-bb77-0bd01ebc904f | controller-2 |
+| a43775e2-88e1-4c0e-83da-53068e2cf153 | worker-0     |
+| aa138594-9fd3-4743-9d9b-d63d6bea0cf6 | worker-1     |
+| 2d406138-9166-494b-bcb5-a7b0c46b4756 | worker-2     |
++--------------------------------------+--------------+
+
 ```
 
 Next: [Provisioning a CA and Generating TLS Certificates](04-certificate-authority.md)
