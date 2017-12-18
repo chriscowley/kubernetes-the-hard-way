@@ -181,10 +181,10 @@ FLAVORID=$(nova flavor-list | grep 'vps-ssd-1' | awk '{print $2}')
 for i in 0 1 2
 do
     nova boot --image='Ubuntu 16.04' --flavor=vps-ssd-1 \
+        --metadata kubetype=controller \
         --nic net-name=Ext-Net \
         --nic net-name=kubernetes-the-hard-way,v4-fixed-ip=10.240.0.1${i} \
         --security-groups=kubernetes-the-hard-way-allow-internal,kubernetes-the-hard-way-allow-external \
-        --tags kubernetes-the-hard-way,controller \
         --user-data scripts/controller-userdata.yml --key-name chris controller-${i}
 done
 ```
@@ -225,7 +225,7 @@ do
         --nic net-name=Ext-Net \
         --nic net-name=kubernetes-the-hard-way,v4-fixed-ip=10.240.0.2${i} \
         --security-groups=kubernetes-the-hard-way-allow-internal,kubernetes-the-hard-way-allow-external \
-        --meta pod-cidr=10.200.${i}.0/24 \
+        --meta pod-cidr=10.200.${i}.0/24,kubetype=worker \
         --tags kubernetes-the-hard-way,worker \
         --user-data scripts/controller-userdata.yml --key-name chris controller-${i}
 done
